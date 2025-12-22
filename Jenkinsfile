@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
     environment {
         IMAGE_NAME      = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
         K8S_NAMESPACE   = "automotive"
@@ -52,10 +57,10 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh """
-                  kubectl apply -f main-service.yaml
-                  kubectl set image deployment/${DEPLOYMENT_NAME} \
-                    main-service=${IMAGE_NAME} \
-                    -n ${K8S_NAMESPACE}
+                    kubectl apply -f main-service.yaml
+                    kubectl set image deployment/${DEPLOYMENT_NAME} \
+                      main-service=${IMAGE_NAME} \
+                      -n ${K8S_NAMESPACE}
                 """
             }
         }
@@ -78,7 +83,7 @@ pipeline {
                     <p><b>Job:</b> ${JOB_NAME}</p>
                     <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
                     <p><b>Status:</b> SUCCESS</p>
-                    <p><b>Image:</b> ${IMAGE_NAME}</p>
+                    <p><b>Docker Image:</b> ${IMAGE_NAME}</p>
                     <p>
                         <b>Build URL:</b>
                         <a href="${BUILD_URL}">${BUILD_URL}</a>
@@ -98,12 +103,17 @@ pipeline {
                     <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
                     <p><b>Status:</b> FAILED</p>
                     <p>
-                        <b>Check Console Output:</b>
+                        <b>Console Output:</b>
                         <a href="${BUILD_URL}">${BUILD_URL}</a>
                     </p>
                 """,
                 to: "erdigvijaypatil01@gmail.com"
             )
+        }
+
+        always {
+            sh "docker logout || true"
+            sh "docker image prune -f || true"
         }
     }
 }
