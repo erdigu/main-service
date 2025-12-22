@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
-        K8S_NAMESPACE = "automotive"
+        IMAGE_NAME      = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
+        K8S_NAMESPACE   = "automotive"
         DEPLOYMENT_NAME = "main-service"
     }
 
@@ -16,7 +16,7 @@ pipeline {
             }
         }
 
-        stage('Build JAR') {
+        stage('Build JAR (Maven)') {
             steps {
                 sh 'mvn clean package -DskipTests'
             }
@@ -35,7 +35,10 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login \
+                        -u "$DOCKER_USER" --password-stdin
+                    '''
                 }
             }
         }
@@ -59,10 +62,48 @@ pipeline {
 
         stage('Verify Rollout') {
             steps {
-                sh """
-                  kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
-                """
+                sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
             }
+        }
+    }
+
+    post {
+
+        success {
+            emailext(
+                subject: "✅ SUCCESS: ${JOB_NAME} #${BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+                    <h2 style="color:green;">Build Successful 🎉</h2>
+                    <p><b>Job:</b> ${JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
+                    <p><b>Status:</b> SUCCESS</p>
+                    <p><b>Image:</b> ${IMAGE_NAME}</p>
+                    <p>
+                        <b>Build URL:</b>
+                        <a href="${BUILD_URL}">${BUILD_URL}</a>
+                    </p>
+                """,
+                to: "erdigvijaypatil01@gmail.com"
+            )
+        }
+
+        failure {
+            emailext(
+                subject: "❌ FAILURE: ${JOB_NAME} #${BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+                    <h2 style="color:red;">Build Failed ❌</h2>
+                    <p><b>Job:</b> ${JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
+                    <p><b>Status:</b> FAILED</p>
+                    <p>
+                        <b>Check Console Output:</b>
+                        <a href="${BUILD_URL}">${BUILD_URL}</a>
+                    </p>
+                """,
+                to: "erdigvijaypatil01@gmail.com"
+            )
         }
     }
 }
