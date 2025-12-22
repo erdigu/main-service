@@ -35,11 +35,13 @@ pipeline {
 
         stage('Docker Login') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login \
                         -u "$DOCKER_USER" --password-stdin
@@ -59,15 +61,18 @@ pipeline {
                 sh """
                     kubectl apply -f main-service.yaml
                     kubectl set image deployment/${DEPLOYMENT_NAME} \
-                      main-service=${IMAGE_NAME} \
-                      -n ${K8S_NAMESPACE}
+                        main-service=${IMAGE_NAME} \
+                        -n ${K8S_NAMESPACE}
                 """
             }
         }
 
         stage('Verify Rollout') {
             steps {
-                sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
+                sh """
+                    kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
+                    kubectl get pods -n ${K8S_NAMESPACE} -l app=customer-service
+                """
             }
         }
     }
