@@ -14,12 +14,12 @@ pipeline {
 
     stages {
 
-        stage('Checkout Code') {
+        /* stage('Checkout Code') {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/erdigu/main-service.git'
             }
-        }
+        } */
 
         stage('Build JAR (Maven)') {
             steps {
@@ -71,7 +71,7 @@ pipeline {
             steps {
                 sh """
                     kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
-                    kubectl get pods -n ${K8S_NAMESPACE} -l app=customer-service
+                    kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service
                 """
             }
         }
