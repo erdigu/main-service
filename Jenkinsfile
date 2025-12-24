@@ -7,15 +7,13 @@ pipeline {
     }
 
     environment {
-        IMAGE_TAG         = "main-service-${BUILD_NUMBER}"   // Use build number or commit hash as the tag
-        IMAGE_NAME        = "erdigvijay/devops_repo:${IMAGE_TAG}"
-        K8S_NAMESPACE     = "automotive"
-        DEPLOYMENT_NAME   = "main-service"
+        IMAGE_NAME      = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
+        K8S_NAMESPACE   = "automotive"
+        DEPLOYMENT_NAME = "main-service"
         AWS_DEFAULT_REGION = "us-east-1"
     }
 
     stages {
-
         stage('Build JAR (Maven)') {
             steps {
                 sh 'mvn clean package -DskipTests'
@@ -40,63 +38,71 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME} ."
+                script {
+                    echo "Building Docker image with tag ${IMAGE_NAME}"
+                    sh "docker build -t ${IMAGE_NAME} ."
+                }
             }
         }
 
         stage('Docker Login') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    script {
+                        echo "Logging into Docker Hub with user ${DOCKER_USER}"
+                        sh '''
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        '''
+                    }
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh "docker push ${IMAGE_NAME}"
+                script {
+                    echo "Pushing Docker image ${IMAGE_NAME} to Docker Hub"
+                    sh "docker push ${IMAGE_NAME}"
+                }
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                // Wrap K8s operations with AWS credentials
-                withCredentials([
+                withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-creds-4eks',  // AWS creds for EKS
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]) {
-                    sh """
-                        aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION
-                        # Update the image tag in the deployment YAML dynamically
-                        sed 's/\${IMAGE_TAG}/${IMAGE_TAG}/' main-service.yaml | kubectl apply -f -
-                        kubectl set image deployment/${DEPLOYMENT_NAME} main-service=${IMAGE_NAME} -n ${K8S_NAMESPACE}
-                    """
+                ]]) {
+                    script {
+                        echo "Updating kubeconfig for EKS"
+                        sh """
+                            aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION
+                        """
+                        echo "Deploying image to Kubernetes"
+                        sh "kubectl apply -f main-service.yaml"
+                        sh "kubectl set image deployment/${DEPLOYMENT_NAME} main-service=${IMAGE_NAME} -n ${K8S_NAMESPACE}"
+                    }
                 }
             }
         }
 
         stage('Verify Rollout') {
             steps {
-                withCredentials([
+                withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-creds-4eks',
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]) {
-                    sh """
-                        kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
-                        kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service
-                    """
+                ]]) {
+                    script {
+                        echo "Verifying rollout in Kubernetes"
+                        sh """
+                            kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
+                            kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service
+                        """
+                    }
                 }
             }
         }

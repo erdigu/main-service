@@ -17,7 +17,7 @@ spec:
         - name: dockerhub-secret
       containers:
         - name: main-service
-          image: erdigvijay/devops_repo:${IMAGE_TAG}  # Dynamically set the image tag
+          image: erdigvijay/devops_repo:main-service-${BUILD_NUMBER}   # Dynamically set the image tag
           ports:
             - containerPort: 8080
           env:
