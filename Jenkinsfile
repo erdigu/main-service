@@ -10,16 +10,10 @@ pipeline {
         IMAGE_NAME      = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
         K8S_NAMESPACE   = "automotive"
         DEPLOYMENT_NAME = "main-service"
+        AWS_DEFAULT_REGION = "us-east-1"
     }
 
     stages {
-
-        /* stage('Checkout Code') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/erdigu/main-service.git'
-            }
-        } */
 
         stage('Build JAR (Maven)') {
             steps {
@@ -43,8 +37,7 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                        echo "$DOCKER_PASS" | docker login \
-                        -u "$DOCKER_USER" --password-stdin
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     '''
                 }
             }
@@ -58,27 +51,42 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh """
-                    kubectl apply -f main-service.yaml
-                    kubectl set image deployment/${DEPLOYMENT_NAME} \
-                        main-service=${IMAGE_NAME} \
-                        -n ${K8S_NAMESPACE}
-                """
+                // Wrap K8s operations with AWS credentials
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds-4eks',  // AWS creds for EKS
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sh """
+                        aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION
+                        kubectl apply -f main-service.yaml
+                        kubectl set image deployment/${DEPLOYMENT_NAME} \
+                            main-service=${IMAGE_NAME} \
+                            -n ${K8S_NAMESPACE}
+                    """
+                }
             }
         }
 
         stage('Verify Rollout') {
             steps {
-                sh """
-                    kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
-                    kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service
-                """
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds-4eks',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sh """
+                        kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
+                        kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service
+                    """
+                }
             }
         }
     }
 
     post {
-
         success {
             emailext(
                 subject: "✅ SUCCESS: ${JOB_NAME} #${BUILD_NUMBER}",
@@ -89,10 +97,7 @@ pipeline {
                     <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
                     <p><b>Status:</b> SUCCESS</p>
                     <p><b>Docker Image:</b> ${IMAGE_NAME}</p>
-                    <p>
-                        <b>Build URL:</b>
-                        <a href="${BUILD_URL}">${BUILD_URL}</a>
-                    </p>
+                    <p><b>Build URL:</b> <a href="${BUILD_URL}">${BUILD_URL}</a></p>
                 """,
                 to: "erdigvijaypatil01@gmail.com"
             )
@@ -107,10 +112,7 @@ pipeline {
                     <p><b>Job:</b> ${JOB_NAME}</p>
                     <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
                     <p><b>Status:</b> FAILED</p>
-                    <p>
-                        <b>Console Output:</b>
-                        <a href="${BUILD_URL}">${BUILD_URL}</a>
-                    </p>
+                    <p><b>Console Output:</b> <a href="${BUILD_URL}">${BUILD_URL}</a></p>
                 """,
                 to: "erdigvijaypatil01@gmail.com"
             )
