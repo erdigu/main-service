@@ -7,11 +7,11 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME      = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
-        K8S_NAMESPACE   = "automotive"
-        DEPLOYMENT_NAME = "main-service"
+        IMAGE_TAG         = "main-service-${BUILD_NUMBER}"   // Use build number or commit hash as the tag
+        IMAGE_NAME        = "erdigvijay/devops_repo:${IMAGE_TAG}"
+        K8S_NAMESPACE     = "automotive"
+        DEPLOYMENT_NAME   = "main-service"
         AWS_DEFAULT_REGION = "us-east-1"
-       // SONAR_TOKEN        = credentials('sonar-jenkins-token')
     }
 
     stages {
@@ -69,18 +69,17 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 // Wrap K8s operations with AWS credentials
-                withCredentials([[
+                withCredentials([
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-creds-4eks',  // AWS creds for EKS
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
+                ]) {
                     sh """
                         aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION
-                        kubectl apply -f main-service.yaml
-                        kubectl set image deployment/${DEPLOYMENT_NAME} \
-                            main-service=${IMAGE_NAME} \
-                            -n ${K8S_NAMESPACE}
+                        # Update the image tag in the deployment YAML dynamically
+                        sed 's/\${IMAGE_TAG}/${IMAGE_TAG}/' main-service.yaml | kubectl apply -f -
+                        kubectl set image deployment/${DEPLOYMENT_NAME} main-service=${IMAGE_NAME} -n ${K8S_NAMESPACE}
                     """
                 }
             }
@@ -88,12 +87,12 @@ pipeline {
 
         stage('Verify Rollout') {
             steps {
-                withCredentials([[
+                withCredentials([
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-creds-4eks',
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
+                ]) {
                     sh """
                         kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
                         kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service

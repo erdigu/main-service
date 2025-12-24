@@ -13,9 +13,11 @@ spec:
       labels:
         app: main-service
     spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
       containers:
         - name: main-service
-          image: erdigvijay/devops_repo:main-service:PLACEHOLDER
+          image: erdigvijay/devops_repo:${IMAGE_TAG}  # Dynamically set the image tag
           ports:
             - containerPort: 8080
           env:
@@ -39,6 +41,7 @@ spec:
       targetPort: 8080
       nodePort: 30080
   type: NodePort
+
 
 # here if we not write ( nodePort: 30080) but you mentioned type: nodeport then kubernetes will assign random port
 # we can check using [ kubectl get svc -n automotive ]
