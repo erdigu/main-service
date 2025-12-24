@@ -7,11 +7,11 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME      = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
-        K8S_NAMESPACE   = "automotive"
-        DEPLOYMENT_NAME = "main-service"
-        AWS_DEFAULT_REGION = "us-east-1"
-        // SONAR_TOKEN        = credentials('sonar-jenkins-token')
+        IMAGE_NAME          = "erdigvijay/devops_repo:main-service-${BUILD_NUMBER}"
+        K8S_NAMESPACE       = "automotive"
+        DEPLOYMENT_NAME     = "main-service"
+        AWS_DEFAULT_REGION  = "us-east-1"
+        // SONAR_TOKEN = credentials('sonar-jenkins-token')
     }
 
     stages {
@@ -70,48 +70,30 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds-4eks',  // AWS creds for EKS
+                    credentialsId: 'aws-creds-4eks',
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
                     script {
                         echo "Updating kubeconfig..."
                         sh "aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION"
-                        echo "Applying the main-service.yaml..."
+
+                        echo "Applying Kubernetes manifests..."
                         sh "kubectl apply -f main-service.yaml"
-                        echo "Setting image for deployment..."
+
+                        echo "Updating deployment image..."
                         sh "kubectl set image deployment/${DEPLOYMENT_NAME} main-service=${IMAGE_NAME} -n ${K8S_NAMESPACE}"
-                        echo "Verifying rollout..."
+
+                        echo "Waiting for rollout to complete..."
                         sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
-                        echo "Getting pods status..."
+
+                        echo "Deployment successful. Current pods:"
                         sh "kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service"
                     }
                 }
             }
         }
-
-        stage('Verify Rollout') {
-    steps {
-        withCredentials([[
-            $class: 'AmazonWebServicesCredentialsBinding',
-            credentialsId: 'aws-creds-4eks',
-            accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-            secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        ]]) {
-            script {
-                echo "Updating kubeconfig..."
-                sh "aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION"
-
-                echo "Verifying rollout..."
-                sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
-
-                echo "Getting pods status..."
-                sh "kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service"
-            }
-        }
     }
-}
-
 
     post {
         success {
