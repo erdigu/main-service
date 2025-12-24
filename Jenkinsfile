@@ -11,6 +11,7 @@ pipeline {
         K8S_NAMESPACE   = "automotive"
         DEPLOYMENT_NAME = "main-service"
         AWS_DEFAULT_REGION = "us-east-1"
+        SONAR_TOKEN        = credentials('sonar-jenkins-token')
     }
 
     stages {
@@ -18,6 +19,22 @@ pipeline {
         stage('Build JAR (Maven)') {
             steps {
                 sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
