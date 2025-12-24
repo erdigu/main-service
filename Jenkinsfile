@@ -11,9 +11,11 @@ pipeline {
         K8S_NAMESPACE   = "automotive"
         DEPLOYMENT_NAME = "main-service"
         AWS_DEFAULT_REGION = "us-east-1"
+        // SONAR_TOKEN        = credentials('sonar-jenkins-token')
     }
 
     stages {
+
         stage('Build JAR (Maven)') {
             steps {
                 sh 'mvn clean package -DskipTests'
@@ -38,32 +40,29 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    echo "Building Docker image with tag ${IMAGE_NAME}"
-                    sh "docker build -t ${IMAGE_NAME} ."
-                }
+                sh "docker build -t ${IMAGE_NAME} ."
             }
         }
 
         stage('Docker Login') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    script {
-                        echo "Logging into Docker Hub with user ${DOCKER_USER}"
-                        sh '''
-                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        '''
-                    }
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                script {
-                    echo "Pushing Docker image ${IMAGE_NAME} to Docker Hub"
-                    sh "docker push ${IMAGE_NAME}"
-                }
+                sh "docker push ${IMAGE_NAME}"
             }
         }
 
@@ -76,13 +75,16 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
                     script {
-                        echo "Updating kubeconfig for EKS"
-                        sh """
-                            aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION
-                        """
-                        echo "Deploying image to Kubernetes"
+                        echo "Updating kubeconfig..."
+                        sh "aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION"
+                        echo "Applying the main-service.yaml..."
                         sh "kubectl apply -f main-service.yaml"
+                        echo "Setting image for deployment..."
                         sh "kubectl set image deployment/${DEPLOYMENT_NAME} main-service=${IMAGE_NAME} -n ${K8S_NAMESPACE}"
+                        echo "Verifying rollout..."
+                        sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
+                        echo "Getting pods status..."
+                        sh "kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service"
                     }
                 }
             }
@@ -90,20 +92,8 @@ pipeline {
 
         stage('Verify Rollout') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds-4eks',
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
-                    script {
-                        echo "Verifying rollout in Kubernetes"
-                        sh """
-                            kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
-                            kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service
-                        """
-                    }
-                }
+                sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
+                sh "kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service"
             }
         }
     }
