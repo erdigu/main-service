@@ -11,7 +11,7 @@ pipeline {
         K8S_NAMESPACE   = "automotive"
         DEPLOYMENT_NAME = "main-service"
         AWS_DEFAULT_REGION = "us-east-1"
-        SONAR_TOKEN        = credentials('sonar-jenkins-token')
+       // SONAR_TOKEN        = credentials('sonar-jenkins-token')
     }
 
     stages {

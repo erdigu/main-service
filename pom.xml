@@ -3,19 +3,27 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
+  <!-- Project information -->
   <groupId>com.example</groupId>
   <artifactId>main-service</artifactId>
   <version>0.0.1-SNAPSHOT</version>
+
+  <!-- Java Version -->
   <properties>
     <java.version>17</java.version>
     <spring.boot.version>3.1.6</spring.boot.version>
   </properties>
+
+  <!-- Parent Spring Boot -->
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.1.6</version>  <!-- Directly set the version here -->
+    <version>3.1.6</version> <!-- Directly set the version here -->
     <relativePath/>
   </parent>
+
+  <!-- Dependencies -->
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -35,12 +43,23 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <!-- Build Configuration -->
   <build>
     <plugins>
+      <!-- Spring Boot Maven Plugin -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+
+      <!-- SonarQube Maven Plugin -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>sonar-maven-plugin</artifactId>
+        <version>3.9.1.2184</version> <!-- Use the latest Sonar plugin version -->
+      </plugin>
     </plugins>
   </build>
+
 </project>
