@@ -45,4 +45,3 @@ spec:
 
 # here if we not write ( nodePort: 30080) but you mentioned type: nodeport then kubernetes will assign random port
 # we can check using [ kubectl get svc -n automotive ]
-
