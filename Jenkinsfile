@@ -91,12 +91,27 @@ pipeline {
         }
 
         stage('Verify Rollout') {
-            steps {
+    steps {
+        withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-creds-4eks',
+            accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+            secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+        ]]) {
+            script {
+                echo "Updating kubeconfig..."
+                sh "aws eks update-kubeconfig --name automotive-cluster --region $AWS_DEFAULT_REGION"
+
+                echo "Verifying rollout..."
                 sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}"
+
+                echo "Getting pods status..."
                 sh "kubectl get pods -n ${K8S_NAMESPACE} -l app=main-service"
             }
         }
     }
+}
+
 
     post {
         success {
